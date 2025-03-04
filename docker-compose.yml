@@ -1,0 +1,51 @@
+x-json_parquet_elt_common:
+  &x_json_parquet_elt_common
+  env_file:
+    - .env
+  networks:
+    - json_to_parquet_elt_network
+  restart: unless-stopped
+
+services:
+  json_to_parquet_elt_app:
+    <<: *x_json_parquet_elt_common
+    build:
+      context: .
+      dockerfile: app/Dockerfile
+    container_name: json_to_parquet_elt_app
+    stdin_open: true
+    tty: true
+    volumes:
+      - ./logs/:/app/logs/
+      - ./data/:/app/data/
+      - ./raw_data/:/app/raw_data/
+      - ./app/src/:/app/src/
+    depends_on:
+      - metadata_postgres_db
+
+  metadata_postgres_db:
+    <<: *x_json_parquet_elt_common
+    build:
+      context: .
+      dockerfile: metadata_db/Dockerfile
+    container_name: metadata_postgres_db
+    environment:
+      POSTGRES_DB: ${METADATA_DB}
+      POSTGRES_USER: ${USER_METADATA_DB}
+      POSTGRES_PASSWORD: ${PASSWORD_METADATA_DB}
+    ports:
+      - "5432:5432"
+    volumes:
+      - metadata_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready", "-U", "$POSTGRES_USER" ]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+
+volumes:
+  metadata_postgres_data:
+
+networks:
+  json_to_parquet_elt_network:
+    driver: bridge
